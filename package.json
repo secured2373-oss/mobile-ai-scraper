@@ -1,8 +1,11 @@
 {
   "name": "mobile-ai-scraper",
   "version": "1.0.0",
+  "description": "AI Subtitle Scraper with Permanent Cloud Storage",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "axios": "^1.7.0",
