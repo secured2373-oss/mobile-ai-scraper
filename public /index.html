@@ -1,1 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Mobile Subtitle Scraper</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f4f6f9; padding: 15px; margin: 0; }
+        .container { max-width: 100%; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); box-sizing: border-box; }
+        h2 { color: #333; margin: 0 0 15px 0; font-size: 20px; text-align: center; }
+        .system-controls { display: flex; gap: 10px; margin-bottom: 15px; }
+        .system-controls button { flex: 1; padding: 10px; font-size: 12px; font-weight: bold; border-radius: 6px; }
+        .btn-danger { background: #dc3545 !important; }
+        .btn-danger:hover { background: #bd2130 !important; }
+        .btn-secondary { background: #6c757d !important; }
+        .btn-secondary:hover { background: #545b62 !important; }
+        label { font-size: 13px; font-weight: 600; color: #444; }
+        input[type="text"], select { width: 100%; padding: 12px; margin: 8px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        .attr-box { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px dashed #bbb; margin-bottom: 15px; min-height: 40px; }
+        .chip { display: inline-flex; align-items: center; background: #e0e0e0; padding: 6px 12px; border-radius: 20px; margin: 4px; font-size: 12px; font-weight: 500; }
+        .chip-remove { margin-left: 8px; color: #888; cursor: pointer; font-weight: bold; }
+        .btn-main { background: #28a745; color: white; border: none; padding: 14px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; font-size: 15px; }
+        .btn-main:hover { background: #218838; }
+        .player-section { margin-top: 15px; background: #111; padding: 10px; border-radius: 8px; text-align: center; }
+        video { width: 100%; max-height: 280px; border-radius: 4px; background: #000; }
+        video::cue { background: rgba(0, 0, 0, 0.8); color: #fff; font-size: 14px; font-weight: bold; }
+        .media-box { display: none; background: #eef7ff; padding: 15px; border-radius: 8px; border: 1px solid #bce0ff; margin-top: 15px; }
+        .loading { display: none; color: #007bff; font-weight: bold; text-align: center; margin-top: 15px; font-size: 14px; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📊 Mobile AI Subtitle Scraper</h2>
+    
+    <!-- System Operation Toggles -->
+    <div class="system-controls">
+        <button class="btn-danger" onclick="clearSystemHistory()">🗑️ Wipe Data</button>
+        <button class="btn-secondary" onclick="createNewCampaignSheet()">📁 New Sheet</button>
+    </div>
+
+    <label><b>Active Sheet Tab Target:</b></label>
+    <select id="sheetSelector">
+        <option value="AI Master Data Log">AI Master Data Log (Default)</option>
+    </select>
+
+    <label><b>Instagram URL Link:</b></label>
+    <input type="text" id="targetUrl" placeholder="Paste Reel link here...">
+
+    <label><b>Custom Column Attributes:</b></label>
+    <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+        <input type="text" id="newAttr" placeholder="e.g., Video_Hook" style="margin:0;">
+        <button type="button" id="addBtn" style="width: auto; margin:0; background:#6c757d; font-weight: bold; border-radius: 6px; color: white; border: none; padding: 0 15px;">➕ Add</button>
+    </div>
+    <div class="attr-box" id="chipsContainer"></div>
+
+    <button class="btn-main" onclick="processDataPipeline()">🚀 Scan & Generate Subtitles</button>
+    <div class="loading" id="loader">🧠 Groq AI is transcribing audio and compiling columns in RAM... Please wait...</div>
+
+    <!-- Live Media Output Review & Excel Generator Dock -->
+    <div class="media-box" id="resultPanel">
+        <h4 style="margin:0 0 10px 0; color:#0056b3; text-align:center;">✅ Process Complete</h4>
+        <div class="player-section">
+            <video id="videoPlayer" controls playsinline>
+                <source id="videoSource" src="" type="video/mp4">
+                <!-- Live Closed Captions Track Pointer -->
+                <track id="subtitleTrack" label="English CC" kind="subtitles" srclang="en" src="" default>
+            </video>
+        </div>
+        <p style="font-size:11px; color:#666; text-align:center; margin: 5px 0 12px 0;">📺 Click the native player 'CC' toggle on your mobile screen to view live subtitles.</p>
+        <button style="background:#007bff;" class="btn-main" id="masterExcelBtn">📥 Download Excel Database File</button>
+    </div>
+</div>
+
+<script>
+    let dynamicAttributes = ['Creator_Name', 'Video_Hook', 'Product_Promoted'];
+    const chipsContainer = document.getElementById('chipsContainer');
+
+    function renderChips() {
+        chipsContainer.innerHTML = '';
+        dynamicAttributes.forEach((attr, idx) => {
+            const chip = document.createElement('div');
+            chip.className = 'chip';
+            chip.innerHTML = `${attr} <span class="chip-remove" onclick="removeAttribute(${idx})">×</span>`;
+            chipsContainer.appendChild(chip);
+        });
+    }
+
+    document.getElementById('addBtn').addEventListener('click', () => {
+        const val = document.getElementById('newAttr').value.trim().replace(/[^a-zA-Z0-9_]/g, '');
+        if(val && !dynamicAttributes.includes(val)) { 
+            dynamicAttributes.push(val); 
+            document.getElementById('newAttr').value = ''; 
+            renderChips(); 
+        }
+    });
+
+    function removeAttribute(idx) { 
+        dynamicAttributes.splice(idx, 1); 
+        renderChips(); 
+    }
+
+    async function clearSystemHistory() {
+        if(!confirm("Are you sure you want to permanently clear your database cloud logs?")) return;
+        try {
+            const res = await fetch('/api/clear-history', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message || "History cleared successfully.");
+            location.reload();
+        } catch (err) {
+            alert("Error clearing logs: " + err.message);
+        }
+    }
+
+    async function createNewCampaignSheet() {
+        const name = prompt("Enter a unique name for your new data tracking tab sheet:");
+        if(!name) return;
+        try {
+            const res = await fetch('/api/new-sheet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sheetName: name })
+            });
+            const d = await res.json();
+            if(d.success) {
+                const selector = document.getElementById('sheetSelector');
+                selector.innerHTML = '';
+                d.currentSheets.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s; opt.textContent = s; selector.appendChild(opt);
+                });
+                selector.value = name;
+                alert(`New campaign path "${name}" successfully registered!`);
+            }
+        } catch (err) {
+            alert("Error creating sheet: " + err.message);
+        }
+    }
+
+    async function processDataPipeline() {
+        const url = document.getElementById('targetUrl').value.trim();
+        if(!url) return alert('Please input an active Instagram URL link.');
+
+        document.getElementById('loader').style.display = 'block';
+        document.getElementById('resultPanel').style.display = 'none';
+
+        try {
+            const response = await fetch('/api/scrape', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    url: url, 
+                    attributes: dynamicAttributes,
+                    targetSheet: document.getElementById('sheetSelector').value
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            // Dynamically reload media paths inside memory blocks
+            document.getElementById('videoSource').src = data.videoLink;
+            document.getElementById('subtitleTrack').src = data.vttLink;
+            
+            const videoPlayer = document.getElementById('videoPlayer');
+            videoPlayer.load();
+
+            // Reroute compilation engine action to Supabase download endpoint
+            document.getElementById('masterExcelBtn').onclick = () => {
+                window.location.href = '/api/download-excel';
+            };
+
+            document.getElementById('resultPanel').style.display = 'block';
+        } catch (err) {
+            alert('Execution Interrupted: ' + err.message);
+        } finally {
+            document.getElementById('loader').style.display = 'none';
+        }
+    }
+
+    // Run layout initializer on boot load
+    renderChips();
+</script>
+</body>
+</html>
+
 document.getElementById('masterExcelBtn').onclick = () => { window.location.href = '/api/download-excel'; };
